@@ -1,54 +1,127 @@
----
-title: 'Tutorial: Using React Native and Expo'
-sidebar_title: Introduction
-description: An introduction to a React Native tutorial on how to build a universal app that runs on Android, iOS and the web using Expo.
----
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  Linking,
+  StyleSheet
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { BookOpen02Icon } from '@expo/styleguide-icons/outline/BookOpen02Icon';
+const shows = [
+  {
+    id: '1',
+    title: 'Diriliş: Ertuğrul',
+    platform: 'Netflix',
+    link: 'https://www.netflix.com/title/80127001',
+    subs: ['EN', 'AR', 'TR']
+  },
+  {
+    id: '2',
+    title: 'Masum',
+    platform: 'BluTV',
+    link: 'https://www.blutv.com/',
+    subs: ['TR']
+  },
+  {
+    id: '3',
+    title: 'Fi',
+    platform: 'YouTube',
+    link: 'https://www.youtube.com/playlist?list=PLk4uE8Fv4LT4EtYlMk0GEfU7fTclGpC9U',
+    subs: ['TR', 'EN']
+  },
+];
 
-import { BoxLink } from '~/ui/components/BoxLink';
-import { ContentSpotlight } from '~/ui/components/ContentSpotlight';
+export default function App() {
+  const [query, setQuery] = useState('');
+  const [selectedSub, setSelectedSub] = useState(null);
+  const [favorites, setFavorites] = useState([]);
 
-We're about to embark on a journey of building universal apps. In this tutorial, we'll create an Expo app that runs on Android, iOS, and web; all with a single codebase. Let's get started!
+  useEffect(() => {
+    loadFavorites();
+  }, []);
 
-## About React Native and Expo tutorial
+  const loadFavorites = async () => {
+    const favs = await AsyncStorage.getItem('favorites');
+    if (favs) {
+      setFavorites(JSON.parse(favs));
+    }
+  };
 
-The objective of this tutorial is to get started with Expo and become familiar with the Expo SDK. It'll cover the following topics:
+  const toggleFavorite = async (id) => {
+    const isFav = favorites.includes(id);
+    const updated = isFav
+      ? favorites.filter((favId) => favId !== id)
+      : [...favorites, id];
 
-- Create an app using the default template with TypeScript enabled
-- Implement a two-screen bottom tabs layout with Expo Router
-- Break down the app layout and implement it with flexbox
-- Use each platform's system UI to select an image from the media library
-- Create a sticker modal using the `<Modal>` and `<FlatList>` components from React Native
-- Add touch gestures to interact with a sticker
-- Use third-party libraries to capture a screenshot and save it to the disk
-- Handle platform differences between Android, iOS, and web
-- Finally, go through the process of configuring a status bar, a splash screen, and an icon to complete the app
+    setFavorites(updated);
+    await AsyncStorage.setItem('favorites', JSON.stringify(updated));
+  };
 
-These topics provide a foundation to learn the fundamentals of building an Expo app. The tutorial is self-paced and can take up to two hours to complete.
+  const filteredShows = shows.filter((show) => {
+    const matchesQuery = show.title.toLowerCase().includes(query.toLowerCase());
+    const matchesSub = selectedSub ? show.subs.includes(selectedSub) : true;
+    return matchesQuery && matchesSub;
+  });
 
-To keep it beginner friendly, we divided the tutorial into nine chapters so that you can follow along or put it down and come back to it later. Each chapter contains the necessary code snippets to complete the steps, so you can follow along by creating an app from scratch or copy and paste it.
+  const renderItem = ({ item }) => {
+    const isFav = favorites.includes(item.id);
+    return (
+      <View style={styles.card}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.platform}>Watch on: {item.platform}</Text>
+        <Text style={styles.subs}>Subtitles: {item.subs.join(', ')}</Text>
 
-Before we get started, take a look at what we'll build. It's an app named **StickerSmash** that runs on Android, iOS, and the web:
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => Linking.openURL(item.link)}
+        >
+          <Text style={styles.buttonText}>Watch Now</Text>
+        </TouchableOpacity>
 
-<ContentSpotlight file="tutorial/final.mp4" />
+        <TouchableOpacity onPress={() => toggleFavorite(item.id)}>
+          <Text style={styles.favorite}>{isFav ? '❤️ Favorited' : '🤍 Add to Favorites'}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
-> **info** The complete source code for this tutorial is available on [GitHub](https://github.com/expo/examples/tree/master/stickersmash).
-
-## How to use this tutorial
-
-We believe in [learning by doing](https://en.wikipedia.org/wiki/Learning-by-doing), so this tutorial emphasizes doing over explaining. You can follow along the journey of building an app by creating the app from scratch.
-
-Throughout the tutorial, any important code or code that has changed between examples will be <span className="tutorial-code-annotation">highlighted in green</span>. You can hover over the highlights (on desktop) or tap them (on mobile) to learn more about the change. For example, the code highlighted in the snippet below explains what it does:
-
-{/* prettier-ignore */}
-```tsx Hello World|collapseHeight=300
-import { StyleSheet, Text, View } from 'react-native';
-
-export default function Index() {
   return (
     <View style={styles.container}>
-      /* @tutinfo This used to say: "Edit app/index.tsx to edit this screen.". Now it says: "Hello world!". */<Text>Hello world!</Text>/* @end */
+      <Text style={styles.header}>🎬 Turkish Show Finder</Text>
+
+      <TextInput
+        style={styles.search}
+        placeholder="Search shows..."
+        placeholderTextColor="#aaa"
+        value={query}
+        onChangeText={setQuery}
+      />
+
+      <View style={styles.filterRow}>
+        {['EN', 'AR', 'TR', null].map((lang) => (
+          <TouchableOpacity
+            key={lang ?? 'All'}
+            style={[
+              styles.filterButton,
+              selectedSub === lang && styles.activeFilter
+            ]}
+            onPress={() => setSelectedSub(lang)}
+          >
+            <Text style={styles.filterText}>
+              {lang ?? 'All'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <FlatList
+        data={filteredShows}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+      />
     </View>
   );
 }
@@ -56,20 +129,75 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#111',
+    paddingTop: 60,
+    paddingHorizontal: 20,
   },
+  header: {
+    fontSize: 24,
+    color: '#fff',
+    marginBottom: 10,
+    fontWeight: 'bold',
+    textAlign: 'center'
+  },
+  search: {
+    backgroundColor: '#222',
+    color: '#fff',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10
+  },
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 15
+  },
+  filterButton: {
+    backgroundColor: '#333',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6
+  },
+  activeFilter: {
+    backgroundColor: '#ff3c3c'
+  },
+  filterText: {
+    color: '#fff',
+    fontWeight: 'bold'
+  },
+  card: {
+    backgroundColor: '#222',
+    padding: 20,
+    borderRadius: 10,
+    marginBottom: 15
+  },
+  title: {
+    fontSize: 20,
+    color: '#fff',
+    fontWeight: 'bold'
+  },
+  platform: {
+    color: '#ccc',
+    marginTop: 5
+  },
+  subs: {
+    color: '#aaa',
+    marginTop: 5
+  },
+  button: {
+    marginTop: 10,
+    backgroundColor: '#ff3c3c',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold'
+  },
+  favorite: {
+    color: '#f9c2ff',
+    textAlign: 'center',
+    marginTop: 10
+  }
 });
-```
-
-## Next step
-
-We're ready to start building our app.
-
-<BoxLink
-  title="Start"
-  Icon={BookOpen02Icon}
-  description="Let's start by creating a new Expo app."
-  href="/tutorial/create-your-first-app"
-/>
